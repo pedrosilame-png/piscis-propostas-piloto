@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piscis Propostas, visão do cliente (piloto fictício)</title>
+<!-- Visão do cliente com o documento completo da proposta. Com #token= busca a
+     proposta de teste no backend do piloto; sem token, prévia local com payload
+     fictício embutido. Sem dados reais. Muralha: apenas códigos FIC.
+     A chave abaixo é a publishable do Supabase, pública por desenho. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f6f4ef;--navy:#0f2a4a;--navy2:#163a63;--ink:#1c2733;--line:#ddd6c8;--ok:#1e7a4f;--warn:#9a6a00;--blue:#2f6fb2}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:Georgia,'Times New Roman',serif;padding:16px}
+.wrap{max-width:560px;margin:0 auto}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+h1{font-size:22px;color:var(--navy);margin-bottom:4px}
+h2{font-size:17px;color:var(--navy);margin-bottom:10px}
+.badge{display:inline-block;background:#fff3d6;color:var(--warn);border:1px solid #f3e3c0;border-radius:999px;padding:3px 10px;font-size:12px;margin-bottom:12px}
+.mut{color:#5b6672;font-size:14px;line-height:1.45}
+label{display:block;font-size:13px;color:var(--navy2);margin:12px 0 4px}
+input,textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:15px;background:#fff}
+textarea{min-height:70px}
+button{cursor:pointer;border:0;border-radius:8px;padding:11px 16px;font-family:inherit;font-size:15px;background:var(--navy);color:#fff;margin-top:12px}
+button.sec{background:#fff;color:var(--navy);border:1px solid var(--navy)}
+button.ok{background:var(--ok)}
+button.warn{background:var(--warn)}
+button.danger{background:#8a2f2f}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;background:#eef3f9;color:var(--navy2)}
+.chip.respondida{background:#e7f6ec;color:var(--ok)}
+.prop{border-top:1px solid var(--line);padding-top:12px;margin-top:12px}
+.ev{font-size:13px;color:#5b6672;margin-top:4px}
+.linkbox{word-break:break-all;font-size:12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:8px}
+.big{font-size:18px;color:var(--navy);margin-bottom:8px}
+.valor{font-size:20px;color:var(--navy);margin:8px 0}
+.msg{margin-top:12px;font-size:14px}
+.msg.erro{color:#8a2f2f}
+.msg.sucesso{color:var(--ok)}
+.hidden{display:none}
+</style>
+<style>
+/* Piscis Wealth - motion do manual (Edição 01). Inline no <style> do artefato. */
+:root{
+  --marfim:#F4F1EA;--marinho:#0B1F3A;--oceano-a:#0C2A52;--oceano-b:#061528;
+  --ardosia:#5B6573;--celeste:#A9C1E0;--champanhe:#E8D6AA;--linha:#DCD7CB;
+  --pw-ease:cubic-bezier(.2,.7,.2,1);
+  --serif:"Newsreader",Georgia,"Times New Roman",serif;
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.pw-oceano{background:linear-gradient(180deg,var(--oceano-a),var(--oceano-b));color:var(--marfim)}
+
+/* Assinatura */
+.pw-sig{display:inline-flex;align-items:center;gap:.42em;font-family:var(--serif);font-weight:400;color:inherit;text-decoration:none;white-space:nowrap}
+.pw-sym{height:.62em;width:auto;overflow:visible}
+.pw-sym path{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+
+/* Nascimento do peixe: os dois arcos */
+.pw-draw .arc1,.pw-draw .arc2{stroke-dasharray:var(--len,40);stroke-dashoffset:var(--len,40)}
+.pw-draw.is-born .arc1{animation:pwArc .9s var(--pw-ease) forwards}
+.pw-draw.is-born .arc2{animation:pwArc .9s var(--pw-ease) .25s forwards}
+@keyframes pwArc{to{stroke-dashoffset:0}}
+
+/* Peixe preenchido */
+.pw-fish{display:block;width:100%;height:auto;overflow:visible}
+.pw-fish .pw-body{opacity:0;transition:opacity .6s var(--pw-ease) 1.1s}
+.pw-fish .pw-outline path{fill:none;stroke:var(--marinho);stroke-width:.35;stroke-linecap:round}
+.pw-fish .pw-outline{transition:opacity .6s var(--pw-ease) 1.3s}
+.pw-fish.is-born .pw-body{opacity:1}
+.pw-fish.is-born .pw-outline{opacity:0}
+.pw-sea{opacity:0;transition:opacity 1.2s var(--pw-ease) 1.4s}
+.is-born .pw-sea{opacity:1}
+.pw-sea-drift{animation:pwDrift var(--drift,32s) linear infinite}
+@keyframes pwDrift{from{transform:translateX(0)}to{transform:translateX(var(--wave,-12px))}}
+
+/* Revelação ao rolar */
+[data-pw-reveal]{opacity:0;transform:translateY(14px);transition:opacity .7s var(--pw-ease),transform .7s var(--pw-ease);transition-delay:var(--pw-delay,0ms)}
+[data-pw-reveal].is-in{opacity:1;transform:none}
+
+/* Pranchas */
+.pw-prancha{display:block;width:100%;height:auto;border-radius:2px}
+.pw-prancha path{fill:none;stroke:var(--celeste);stroke-opacity:.38;stroke-width:1}
+.pw-prancha path.pw-accent{stroke:var(--champanhe);stroke-opacity:.9;stroke-width:1.4}
+
+/* Hover sóbrio */
+a{transition:color .25s var(--pw-ease)}
+.pw-link{color:var(--marinho);text-decoration:underline;text-decoration-color:var(--linha);text-underline-offset:4px;transition:text-decoration-color .25s var(--pw-ease),color .25s var(--pw-ease)}
+.pw-link:hover{color:var(--oceano-a);text-decoration-color:currentColor}
+.pw-btn{transition:transform .25s var(--pw-ease),background-color .25s var(--pw-ease),color .25s var(--pw-ease)}
+.pw-btn:hover{transform:translateY(-2px)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  [data-pw-reveal]{opacity:1;transform:none}
+  .pw-draw .arc1,.pw-draw .arc2{stroke-dashoffset:0}
+  .pw-fish .pw-body,.pw-sea{opacity:1}.pw-fish .pw-outline{opacity:0}
+}
+
+/* Layout: bancada do consultor em papel marfim. Abertura com o peixe e a janela oceano da projeção, depois entrevista, documento, acervo e parâmetros em sequência. */
+:root{
+  --bg:#F4F1EA; --fg:#0B1F3A; --muted:#5B6573; --rule:#DCD7CB; --card:#FAF8F3;
+  --btn-bg:#0B1F3A; --btn-fg:#F4F1EA; --track:#E7E2D7; --fish-edge:transparent;
+  --c-emerg:#A9C1E0; --c-futura:#5B6573; --c-estrat:#0B1F3A; --c-hoje:#CFC9BC;
+  --ok:#4F7A63; --crit:#9A5548;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#08182F; --fg:#F4F1EA; --muted:#A9B4C4; --rule:#23395A; --card:#0D2443;
+  --btn-bg:#F4F1EA; --btn-fg:#0B1F3A; --track:#1A3253; --fish-edge:#A9C1E0;
+  --c-emerg:#A9C1E0; --c-futura:#7D8899; --c-estrat:#F4F1EA; --c-hoje:#3A4D69;
+  --ok:#8FB59F; --crit:#D49A8C; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#08182F; --fg:#F4F1EA; --muted:#A9B4C4; --rule:#23395A; --card:#0D2443;
+  --btn-bg:#F4F1EA; --btn-fg:#0B1F3A; --track:#1A3253; --fish-edge:#A9C1E0;
+  --c-emerg:#A9C1E0; --c-futura:#7D8899; --c-estrat:#F4F1EA; --c-hoje:#3A4D69;
+  --ok:#8FB59F; --crit:#D49A8C; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) body{background:linear-gradient(180deg,var(--oceano-a),var(--oceano-b)) fixed}}
+:root[data-theme="dark"] body{background:linear-gradient(180deg,var(--oceano-a),var(--oceano-b)) fixed}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--serif);font-weight:300;letter-spacing:-.01em;line-height:1.08;text-wrap:balance;margin:0}
+p{margin:0}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+.num{font-family:var(--sans);font-variant-numeric:tabular-nums}
+.lbl{font-family:var(--sans);font-size:13px;font-weight:400;color:var(--muted)}
+.long{font-family:var(--serif);font-weight:400;font-size:17px;line-height:1.55}
+.pw-fish .pw-outline path{stroke:var(--fg)}
+.pw-fish .pw-body{stroke:var(--fish-edge);stroke-width:.12;stroke-opacity:.6}
+
+/* botões */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 16px;border-radius:2px;border:1px solid var(--rule);background:transparent;color:var(--fg);font:inherit;font-size:14px;text-decoration:none;cursor:pointer}
+.btn.primary{background:var(--btn-bg);border-color:var(--btn-bg);color:var(--btn-fg)}
+.btn.sm{min-height:32px;padding:0 12px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn .count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* topo */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);border-bottom:1px solid var(--rule)}
+.top .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding-block:12px}
+.top .pw-sig{font-size:21px;margin-right:4px}
+.top .prod{font-size:13px;color:var(--muted);margin-right:auto}
+.top nav{display:flex;flex-wrap:wrap;gap:8px}
+
+/* abertura */
+.hero{padding-block:clamp(36px,6vw,72px) 12px}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:clamp(24px,4vw,56px);align-items:center}
+.hero h1{font-size:clamp(36px,5.2vw,60px);margin-top:14px}
+.hero h1 em{font-style:italic;font-weight:400}
+.hero .long{margin-top:18px;max-width:56ch;color:var(--fg)}
+.reservas{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:22px;font-size:13px;color:var(--muted)}
+.reservas b{font-weight:500;color:var(--fg)}
+.hero-art{display:grid;gap:18px;justify-items:center}
+.hero-fish{width:min(100%,300px)}
+.janela{width:100%;max-width:420px;border-radius:2px;padding:20px 22px;display:grid;gap:6px;position:relative;overflow:hidden}
+.janela .row{display:flex;justify-content:space-between;font-size:12px;color:var(--celeste)}
+.janela .big{font-size:clamp(28px,4vw,36px);font-weight:400;font-variant-numeric:tabular-nums;color:var(--marfim);letter-spacing:-.01em}
+.janela .big-l{font-size:13px;color:var(--champanhe)}
+.janela .sub{font-size:13px;color:var(--celeste);font-variant-numeric:tabular-nums}
+.exemplo{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:28px;padding:12px 16px;border:1px solid var(--rule);background:var(--card);font-size:13.5px;color:var(--muted)}
+.exemplo span{flex:1 1 260px;min-width:0}
+@media (max-width:860px){.hero-grid{grid-template-columns:1fr}}
+
+/* seções */
+section.blk{padding-block:clamp(40px,6vw,72px)}
+.sec-head{display:grid;gap:6px;margin-bottom:24px;max-width:70ch}
+.sec-head h2{font-size:clamp(28px,3.4vw,40px)}
+.sec-head p.long{color:var(--muted);font-size:16px}
+.rule-top{border-top:1px solid var(--rule)}
+
+/* entrevista */
+.bench{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.bench-main{flex:999 1 560px;min-width:0;display:grid;gap:12px}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:0;margin:0;list-style:none;border:1px solid var(--rule);background:var(--card);padding:6px}
+.steps li{min-height:40px;display:flex;align-items:center;gap:8px;padding:0 10px;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.steps li .n{font-size:11px;font-variant-numeric:tabular-nums}
+.steps li[aria-current="step"]{color:var(--fg);box-shadow:inset 0 -2px 0 var(--fg)}
+@media (max-width:560px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.panel{border:1px solid var(--rule);background:var(--card);padding:clamp(18px,3vw,28px);display:grid;gap:18px}
+.panel-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px}
+.panel-h h3{font-size:26px}
+.panel-h .tot{font-size:13px;color:var(--ok);font-variant-numeric:tabular-nums}
+.stack{display:flex;height:12px;overflow:hidden;background:var(--track)}
+.stack span{display:block;height:100%;transition:width .5s var(--pw-ease)}
+.s-emerg{background:var(--c-emerg)} .s-futura{background:var(--c-futura)} .s-estrat{background:var(--c-estrat)}
+.slider{display:grid;gap:6px}
+.slider label{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;font-size:13.5px}
+.slider label b{font-weight:500;font-variant-numeric:tabular-nums}
+.slider input{width:100%;accent-color:var(--fg)}
+.note{font-size:12.5px;color:var(--muted)}
+.panel-f{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:16px;border-top:1px solid var(--rule)}
+.panel-f .mid{font-size:12px;color:var(--muted);text-align:center}
+.summary{flex:1 1 300px;min-width:0;max-width:380px;border:1px solid var(--rule);background:var(--card);padding:20px;display:grid;gap:16px}
+.summary .big{font-size:30px;font-weight:400;letter-spacing:-.01em;line-height:1.1;font-variant-numeric:tabular-nums;margin-top:4px}
+.summary .sub{font-size:13px;color:var(--muted);margin-top:4px}
+.summary .sub b{font-weight:500;color:var(--fg);font-variant-numeric:tabular-nums}
+.mini-bar .r{display:flex;justify-content:space-between;font-size:13px}
+.mini-bar .r span:last-child{color:var(--muted);font-variant-numeric:tabular-nums}
+.mini-bar .t{height:5px;margin-top:6px;background:var(--track);overflow:hidden}
+.mini-bar .t span{display:block;height:100%;transition:width .5s var(--pw-ease)}
+dl.kv{margin:0;display:grid;gap:8px;border-top:1px solid var(--rule);padding-top:14px;font-size:13px}
+dl.kv div{display:flex;justify-content:space-between;gap:12px}
+dl.kv dt{color:var(--muted)} dl.kv dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+@media (max-width:900px){.summary{max-width:none}}
+
+/* celular */
+.phone-row{display:flex;flex-wrap:wrap;gap:32px;align-items:flex-start}
+.phone-row>p{flex:1 1 260px;min-width:0;max-width:44ch}
+.phone{width:100%;max-width:390px;border:1px solid var(--rule);background:var(--bg);display:flex;flex-direction:column}
+.phone header{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--rule)}
+.phone header .pw-sig{font-size:18px;margin-right:auto}
+.phone .prog{padding:14px 16px 0;display:grid;gap:8px}
+.phone .prog .r{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.phone .prog .r span:last-child{color:var(--fg)}
+.ticks{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
+.ticks span{height:3px;background:var(--track)} .ticks span.on{background:var(--fg)}
+.phone .card{margin:14px 16px 0;padding:18px;border:1px solid var(--rule);background:var(--card);display:grid;gap:14px}
+.phone .card h3{font-size:24px}
+.fld{display:grid;gap:6px;min-width:0}
+.fld label{font-size:12.5px;color:var(--muted)}
+.inp{height:44px;width:100%;padding:0 12px;border:1px solid var(--rule);border-radius:2px;background:var(--bg);color:var(--fg);font:inherit;font-variant-numeric:tabular-nums}
+.inp:focus{outline:none;border-color:var(--fg)}
+.g2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.phone .foot{margin-top:14px;padding:12px 16px 18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;border-top:1px solid var(--rule)}
+.phone .foot .btn{min-height:48px}
+
+/* documento */
+.doc-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:18px}
+.doc-tools h2{font-size:clamp(28px,3.4vw,40px);margin-right:auto}
+.doc-tools .status{font-size:13px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.doc-tools .status::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--fg)}
+.doc{display:grid;gap:16px;max-width:1000px}
+.capa{padding:clamp(24px,4vw,40px);display:grid;gap:10px;position:relative;overflow:hidden}
+.capa .pw-sig{font-size:22px;color:var(--marfim)}
+.capa .lbl{color:var(--celeste);margin-top:22px}
+.capa h1{font-size:clamp(36px,5vw,48px);color:var(--marfim)}
+.capa .long{color:var(--marfim);max-width:62ch;font-size:16px}
+.capa .meta{display:flex;flex-wrap:wrap;gap:6px 24px;font-size:13px;color:var(--celeste);font-variant-numeric:tabular-nums;margin-top:6px}
+.capa-prancha{position:absolute;right:0;top:0;width:min(46%,360px);opacity:.55;pointer-events:none}
+@media (max-width:640px){.capa-prancha{display:none}}
+.dsec{border:1px solid var(--rule);background:var(--card);padding:clamp(18px,3vw,28px);display:grid;gap:18px}
+.dsec h3{font-size:26px;margin-top:2px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px}
+.tile{border-top:1px solid var(--rule);padding-top:12px}
+.tile .v{font-size:22px;font-weight:400;font-variant-numeric:tabular-nums;margin-top:4px;letter-spacing:-.01em}
+.tile .s{font-size:12px;color:var(--muted);margin-top:2px}
+.cols2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px}
+.cols2 .long{font-size:16px;margin-top:4px}
+.alloc{display:flex;flex-wrap:wrap;gap:24px;align-items:center}
+.alloc .donut{flex:1 1 240px;min-width:0;display:grid;gap:10px;justify-items:center}
+.alloc .donut svg{width:100%;max-width:240px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+.rcards{flex:1 1 340px;min-width:0;display:grid;gap:10px}
+.rcard{display:grid;grid-template-columns:96px minmax(0,1fr);gap:14px;align-items:center;border:1px solid var(--rule);padding:10px 14px 10px 10px}
+.rcard .pw-prancha{width:96px}
+.rcard .v{font-size:19px;font-variant-numeric:tabular-nums;margin-top:2px}
+.rcard .s{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.chart{overflow-x:auto}
+.chart svg{display:block;width:100%;min-width:320px}
+.chart text{font-family:var(--sans);fill:var(--muted)}
+.chart .grid{stroke:var(--rule)}
+.chart .lbl-strong{fill:var(--fg);font-weight:500}
+.f-hoje{fill:var(--c-hoje)} .f-emerg{fill:var(--c-emerg)} .f-futura{fill:var(--c-futura)} .f-estrat{fill:var(--c-estrat)}
+.st-emerg{stroke:var(--c-emerg)} .st-futura{stroke:var(--c-futura)} .st-estrat{stroke:var(--c-estrat)}
+.line-piscis{stroke:var(--fg)} .fill-piscis{fill:var(--fg)} .line-atual{stroke:var(--muted)}
+.pw-bar{transform-box:fill-box;transform-origin:bottom;animation:pwBar .9s var(--pw-ease) both}
+@keyframes pwBar{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.timeline{display:grid}
+.tl{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:14px;align-items:start;padding:12px 0;border-top:1px solid var(--rule)}
+.tl:first-child{border-top:0}
+.tl .k{width:26px;height:26px;border-radius:50%;border:1px solid var(--fg);display:grid;place-items:center;font-size:11px;font-variant-numeric:tabular-nums}
+.tl b{font-weight:500}
+.tl p{font-size:13px;color:var(--muted);margin-top:2px}
+.tl .w{font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+@media (max-width:560px){.tl{grid-template-columns:28px minmax(0,1fr)}.tl .w{grid-column:2}}
+.disc{font-size:12px;line-height:1.55;color:var(--muted)}
+.print-only{display:none}
+
+/* acervo */
+.acervo{display:grid;gap:10px;max-width:720px}
+.prop{border:1px solid var(--rule);background:var(--card);padding:12px 14px;display:grid;gap:8px}
+.prop .h{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.prop .h b{font-weight:500;margin-right:auto}
+.prop .st{font-size:12.5px;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+.prop .st i{width:6px;height:6px;border-radius:50%;background:currentColor}
+.st.ok{color:var(--ok)} .st.crit{color:var(--crit)}
+.prop .m{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.prop .a{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.prop .a .ask{margin-right:auto;font-size:13px;color:var(--crit)}
+.btn.danger{border-color:var(--crit);color:var(--crit)}
+
+/* parâmetros */
+.params{display:grid;gap:12px;max-width:720px}
+.pgroup{border:1px solid var(--rule);background:var(--card);padding:16px;display:grid;gap:12px}
+.pgroup .t{font-size:13px;color:var(--fg);font-weight:500}
+.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.g3{grid-template-columns:1fr}.g2.p{grid-template-columns:1fr}}
+.hist{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.saved{font-size:13px;color:var(--muted);min-height:1.4em}
+
+/* rodapé */
+footer{border-top:1px solid var(--rule);padding-block:40px;font-size:13px;color:var(--muted)}
+footer .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:24px}
+footer .pw-sig{font-size:22px;color:var(--fg)}
+footer .lines{display:grid;gap:6px;margin-top:10px}
+footer nav{display:flex;flex-wrap:wrap;gap:6px 18px}
+footer a{color:var(--fg);text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:4px}
+footer a:hover{text-decoration-color:currentColor}
+.sel{user-select:all}
+@media (max-width:760px){footer .wrap{grid-template-columns:1fr}}
+
+
+/* PDF da proposta: cópia do documento em papel marfim, montada fora da tela */
+.pdf-msg{flex-basis:100%;font-size:13px;color:var(--muted);min-height:0;margin:0}
+.pdf-msg:empty{display:none}
+.pdf-stage{position:fixed;left:-12000px;top:0;width:794px;padding:0;pointer-events:none;
+  --bg:#F4F1EA;--fg:#0B1F3A;--muted:#5B6573;--rule:#DCD7CB;--card:#F4F1EA;--c-emerg:#A9C1E0;--c-futura:#5B6573;--c-estrat:#0B1F3A;--c-hoje:#CFC9BC;
+  background:#F4F1EA;color:#0B1F3A;color-scheme:light}
+.pdf-stage *{animation:none!important;transition:none!important}
+.pdf-stage [data-pw-reveal]{opacity:1!important;transform:none!important}
+.pdf-stage .doc{max-width:none;gap:14px}
+.pdf-stage .capa{background:none!important;color:#0B1F3A;border-bottom:1px solid #DCD7CB;padding:0 0 18px}
+.pdf-stage .capa .pw-sig,.pdf-stage .capa h1,.pdf-stage .capa .long{color:#0B1F3A}
+.pdf-stage .capa .lbl,.pdf-stage .capa .meta{color:#5B6573}
+.pdf-stage .capa-prancha{display:none!important}
+.pdf-stage .dsec{background:none;padding:18px}
+.pdf-stage .chart{overflow:visible}
+.pdf-stage .line-draw{stroke-dasharray:none!important;stroke-dashoffset:0!important}
+.pdf-stage .print-only{display:block}
+.pdf-stage .print-foot{margin-top:18px;padding-top:12px;border-top:1px solid #DCD7CB;font-size:11px;color:#5B6573;display:flex;flex-wrap:wrap;gap:4px 18px}
+
+/* impressão do documento */
+@media print{
+  @page{margin:16mm}
+  :root{--bg:#F4F1EA;--fg:#0B1F3A;--muted:#5B6573;--rule:#DCD7CB;--card:#F4F1EA;--c-emerg:#A9C1E0;--c-futura:#5B6573;--c-estrat:#0B1F3A;--c-hoje:#CFC9BC;color-scheme:light}
+  html,body{background:#F4F1EA!important;color:#0B1F3A;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body::before,.top,.hero,#entrevista,#celular,#acervo,#parametros,footer,.doc-tools .btn,.capa-prancha{display:none!important}
+  section.blk{padding:0}
+  [data-pw-reveal]{opacity:1!important;transform:none!important}
+  .capa{background:none!important;color:#0B1F3A;border-bottom:1px solid #DCD7CB;padding:0 0 18px}
+  .capa .pw-sig,.capa h1,.capa .long{color:#0B1F3A}
+  .capa .lbl,.capa .meta{color:#5B6573}
+  .dsec{break-inside:avoid;background:none}
+  .print-only{display:block}
+  .print-foot{margin-top:18px;padding-top:12px;border-top:1px solid #DCD7CB;font-size:11px;color:#5B6573;display:flex;flex-wrap:wrap;gap:4px 18px}
+}
+</style>
+<style>
+.wrap{max-width:860px}
+@media (max-width:560px){dl.kv div{flex-direction:column;gap:2px} dl.kv dd{text-align:left}}
+#cli-doc .capa{border-radius:8px;overflow:hidden}
+#cli-doc .dsec{padding-left:0;padding-right:0}
+.chart{overflow-x:visible}
+dl.kv dd .sub{display:block}
+.chart svg{min-width:0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <span class="badge">PILOTO FICTÍCIO, dados de teste</span>
+    <h1>Piscis Propostas</h1>
+    <p class="mut">Proposta enviada pelo seu consultor.</p>
+  </div>
+  <div class="card">
+    <div class="big" id="cli-alias"></div>
+    <p class="mut">Preparada por <span id="cli-consultor"></span> em <span id="cli-data"></span>.</p>
+    <p class="mut" id="cli-objetivo" style="margin-top:8px"></p>
+  </div>
+  <div class="card" id="cli-card">
+    <div id="cli-doc"></div>
+  </div>
+  <div class="card">
+    <p class="mut" id="cli-aviso" style="font-size:13px"></p>
+    <div id="cli-status-area" style="margin-top:10px"></div>
+  </div>
+  <div class="card hidden" id="cli-responder">
+    <h2>Como você deseja responder a esta proposta de teste?</h2>
+    <label for="cli-nota">Observação (opcional, vale apenas neste teste)</label>
+    <textarea id="cli-nota" placeholder="Escreva aqui, se quiser"></textarea>
+    <div class="row">
+      <button class="ok" data-resp="aprovada">Aprovar (teste)</button>
+      <button class="warn" data-resp="ressalvas">Aprovar com ressalvas (teste)</button>
+      <button class="danger" data-resp="reprovada">Reprovar (teste)</button>
+    </div>
+    <p class="msg erro" id="cli-erro"></p>
+  </div>
+  <div class="card hidden" id="cli-confirmar">
+    <h2 id="conf-titulo"></h2>
+    <p class="mut">Este é um piloto com dados fictícios. Nenhuma proposta real está sendo aceita, recusada ou enviada.</p>
+    <div class="row">
+      <button id="conf-sim">Confirmar resposta</button>
+      <button class="sec" id="conf-voltar">Voltar</button>
+    </div>
+  </div>
+  <div class="card hidden" id="cli-final">
+    <h2>Resposta registrada neste piloto fictício.</h2>
+    <p class="mut">Nenhuma proposta real foi aceita ou enviada. Obrigado por testar o fluxo.</p>
+  </div>
+</div>
+
+<script>
+/* Piscis Propostas - motor, gráficos e documento (compartilhado entre o gerador
+   e a visão do cliente). Sem acesso a DOM fora das funções de decoração. */
+var PiscisDoc = (function(){
+"use strict";
+
+/*ENGINE-START*/
+var PARAM_DEFS = [
+  {id:"p1", rotulo:"Emergência (% a.m.)", def:"1,32", tipo:"pct"},
+  {id:"p2", rotulo:"Futura (% a.m.)", def:"1,34", tipo:"pct"},
+  {id:"p3", rotulo:"Faixa 1 até (R$)", def:"100.000", tipo:"moeda"},
+  {id:"p4", rotulo:"Faixa 1 (% a.m.)", def:"1,5", tipo:"pct"},
+  {id:"p5", rotulo:"Faixa 2 até (R$)", def:"500.000", tipo:"moeda"},
+  {id:"p6", rotulo:"Faixa 2 (% a.m.)", def:"1,8", tipo:"pct"},
+  {id:"p7", rotulo:"Faixa 3 até (R$)", def:"1.000.000", tipo:"moeda"},
+  {id:"p8", rotulo:"Faixa 3 (% a.m.)", def:"2", tipo:"pct"},
+  {id:"p9", rotulo:"Multiplicador (x)", def:"60", tipo:"num"},
+  {id:"p11", rotulo:"Consórcio (% PL)", def:"10", tipo:"pct"}
+];
+
+function parseBR(s){
+  if(typeof s === "number") return s;
+  s = String(s==null?"":s).trim().replace(/[R$\s]/g,"");
+  if(!s) return 0;
+  if(s.indexOf(",")>=0){ s = s.replace(/\./g,"").replace(",","."); }
+  else if(/^\d{1,3}(\.\d{3})+$/.test(s)){ s = s.replace(/\./g,""); }
+  var v = parseFloat(s);
+  return isFinite(v) ? v : 0;
+}
+function fmtInt(v){ return Math.round(v).toLocaleString("pt-BR"); }
+function fmtMoney(v){ return "R$ " + fmtInt(v); }
+function fmtMi(v){
+  if(v >= 1000000){ var m = v/100000; return "R$ " + (Math.round(m)/10).toFixed(1).replace(".",",") + "M"; }
+  if(v >= 1000) return "R$ " + Math.round(v/1000) + "k";
+  return "R$ " + Math.round(v);
+}
+function fmtPct(v, dec){
+  if(dec==null) dec = 2;
+  return v.toFixed(dec).replace(".",",") + "%";
+}
+function fmtOr(v, f, pend){ return v==null ? (pend||"A definir") : f(v); }
+function defaultParams(){
+  var P = {}; PARAM_DEFS.forEach(function(d){ P[d.id] = parseBR(d.def); });
+  return P;
+}
+function faixaEstrat(v, P){
+  if(v <= P.p3) return {taxa:P.p4, rotulo:"até " + fmtMi(P.p3)};
+  if(v <= P.p5) return {taxa:P.p6, rotulo:fmtMi(P.p3) + " a " + fmtMi(P.p5)};
+  if(v <= P.p7) return {taxa:P.p8, rotulo:fmtMi(P.p5) + " a " + fmtMi(P.p7)};
+  return {taxa:null, rotulo:"acima de " + fmtMi(P.p7) + " · faixa a definir", pendente:true};
+}
+
+/* dados: {nome, idade, dependentes, renda, objImediato, visao5, pl, imobilizado,
+           pctA, pctB, pctC, carteiraAtual, capAtual, objConsorcio, consultor:{nome,email,tel}} */
+function calcular(d, P){
+  var total = d.pl;
+  var a = total*d.pctA/100, b = total*d.pctB/100, c = total*d.pctC/100;
+  var projE = a*Math.pow(1+P.p1/100, 36);
+  var projF = b*Math.pow(1+P.p2/100, 36);
+  var fx = faixaEstrat(c, P);
+  var fxPend = fx.pendente === true;
+  var r = fxPend ? 0 : fx.taxa/100;
+  var dividendos = fxPend ? null : c*r;
+  var projS = fxPend ? null : c*Math.pow(1+r, 36);
+  var projTotal = fxPend ? null : projE+projF+projS;
+  var rentMedia = (!fxPend && total>0) ? (Math.pow(projTotal/total, 1/36)-1)*100 : null;
+  var minEsp = P.p1;
+  var capitalIdeal = d.renda * P.p9;
+  var premio = null;
+  var consorcio = total * P.p11/100;
+  /* serie para graficos: coerente com o modelo explicitado. Emergencia e futura
+     capitalizam; estrategica capitaliza com rendimentos REINVESTIDOS mes a mes
+     (juros compostos; decisao do Pedro 26/11). Quando a faixa esta pendente,
+     a estrategica aparece so com o capital, sem projetar rendimento. */
+  function serie(m){
+    var e = a*Math.pow(1+P.p1/100, m);
+    var f = b*Math.pow(1+P.p2/100, m);
+    var s = fxPend ? c : c*Math.pow(1+r, m);
+    return {m:m, e:e, f:f, s:s, total:e+f+s, atual:total*Math.pow(1+d.carteiraAtual/100, m)};
+  }
+  return {a:a,b:b,c:c,projE:projE,projF:projF,projS:projS,projTotal:projTotal,
+    dividendos:dividendos,faixa:fx,fxPend:fxPend,rentMedia:rentMedia,minEsp:minEsp,
+    capitalIdeal:capitalIdeal,premio:premio,consorcio:consorcio,serie:serie,
+    varPct: (projTotal!=null && total>0) ? (projTotal/total-1)*100 : null};
+}
+var CRONOGRAMA = [
+  {n:1, t:"Abertura de conta e documentação", d:"Abertura de conta na corretora parceira, envio de documentos e assinatura do contrato de assessoria.", sem:1, acum:1},
+  {n:2, t:"Transferência de custódia", d:"Solicitação de TED/transferência dos ativos da corretora atual para a nova. Prazo médio: 5 dias úteis.", sem:1, acum:2},
+  {n:3, t:"Estratégia · Reserva de emergência", d:"Aplicação em 3 fundos de liquidez diária (Fundo A, B e C). Objetivo: proteção imediata com rentabilidade.", sem:2, acum:4},
+  {n:4, t:"Estratégia · Reserva futura (dolarizada)", d:"Exposição ao dólar via fundos internacionais ou BDRs. Proteção cambial e acesso ao mercado americano.", sem:2, acum:6},
+  {n:5, t:"Estratégia · Reserva estratégica", d:"Aplicação em ativos da economia real com maior rentabilidade, conforme a faixa patrimonial do cliente.", sem:3, acum:9},
+  {n:6, t:"Contratação de seguro de vida", d:"Estudo do capital segurado ideal, cotação com seguradoras e contratação da apólice de proteção familiar.", sem:4, acum:13},
+  {n:7, t:"Análise de consórcio", d:"Levantamento de opções de consórcio conforme o objetivo do cliente e simulação de cartas de crédito.", sem:4, acum:17},
+  {n:8, t:"Revisão e rebalanceamento", d:"Reunião de acompanhamento para revisar performance, rebalancear carteira e ajustar estratégia.", sem:12, acum:29}
+];
+/*ENGINE-END*/
+
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* ---------- gráficos: viewBox na largura real do contêiner (1 unidade = 1 px),
+   fontes em tamanho real em qualquer tela; sem rolagem horizontal ---------- */
+function niceMax(v){
+  var p = Math.pow(10, Math.floor(Math.log10(v||1)));
+  var n = v/p;
+  var step = n<=1?1 : n<=2?2 : n<=2.5?2.5 : n<=5?5 : 10;
+  return step*p;
+}
+function donutSVG(d, calc){
+  var C = 2*Math.PI*70, segs = [
+    {cls:"st-emerg", pct:d.pctA},
+    {cls:"st-estrat", pct:d.pctC},
+    {cls:"st-futura", pct:d.pctB}
+  ], cum = 0, out = "";
+  segs.forEach(function(sg){
+    var seg = sg.pct/100*C;
+    out += '<circle class="'+sg.cls+'" cx="100" cy="100" r="70" fill="none" stroke-width="22" stroke-dasharray="'+Math.max(seg-2,0.5).toFixed(1)+' '+C.toFixed(1)+'" stroke-dashoffset="'+(-cum).toFixed(1)+'" transform="rotate(-90 100 100)"></circle>';
+    cum += seg + 0.05;
+  });
+  return '<svg viewBox="0 0 200 200" role="img" aria-label="Distribuição entre as três reservas">'+out+
+    '<text x="100" y="94" text-anchor="middle" style="fill:var(--muted);font-family:var(--sans);font-size:9px">Total alocado</text>'+
+    '<text x="100" y="114" text-anchor="middle" style="fill:var(--fg);font-family:var(--sans);font-size:16px;font-weight:500">'+fmtMi(calc.a+calc.b+calc.c)+'</text></svg>';
+}
+function eixoY(max, ml, mr, base, topo, W){
+  var grid = "";
+  for(var i=0;i<=4;i++){
+    var v = max*i/4, y = base - (base-topo)*i/4;
+    grid += '<line class="grid" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+y+'" y2="'+y+'"></line>'+
+      '<text x="'+(ml-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="12">'+fmtMi(v)+'</text>';
+  }
+  return grid;
+}
+function barsSVG(calc, W){
+  var H = Math.max(170, Math.round(W/3)), ml = 58, mr = 12, base = H-30, topo = 12;
+  var grupos = [
+    {nome:"Emergência", hoje:calc.a, dep:calc.projE, cls:"f-emerg"},
+    {nome:"Futura", hoje:calc.b, dep:calc.projF, cls:"f-futura"},
+    {nome:"Estratégica", hoje:calc.c, dep:calc.projS, cls:"f-estrat"}
+  ];
+  var vals = grupos.map(function(g){ return Math.max(g.hoje, g.dep||0); });
+  var max = niceMax(Math.max.apply(null, vals.concat([1])));
+  var larg = x1menos(ml, mr, W);
+  var bars = "";
+  grupos.forEach(function(g, i){
+    var cx = ml + larg*(i+0.5)/3;
+    var bw = Math.min(70, larg/3*0.34);
+    var hh = Math.max(g.hoje/max*(base-topo), g.hoje>0?1.5:0);
+    var hd = g.dep==null ? 0 : Math.max(g.dep/max*(base-topo), g.dep>0?1.5:0);
+    bars += '<rect class="pw-bar f-hoje" x="'+(cx-bw-3).toFixed(1)+'" y="'+(base-hh).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hh.toFixed(1)+'" rx="2"></rect>';
+    if(g.dep!=null) bars += '<rect class="pw-bar '+g.cls+'" x="'+(cx+3).toFixed(1)+'" y="'+(base-hd).toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+hd.toFixed(1)+'" rx="2" style="animation-delay:.15s"></rect>';
+    bars += '<text x="'+cx.toFixed(1)+'" y="'+(H-10)+'" text-anchor="middle" font-size="12.5">'+g.nome+'</text>';
+  });
+  return '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Valores de hoje comparados a 36 meses por reserva">'+eixoY(max,ml,mr,base,topo,W)+bars+'</svg>';
+}
+function x1menos(ml, mr, W){ return W-ml-mr; }
+function lineSVG(calc, W){
+  var H = Math.max(170, Math.round(W/3)), ml = 58, mr = 12, base = H-30, topo = 12;
+  var max = niceMax(Math.max(calc.serie(36).total, 1));
+  var larg = x1menos(ml, mr, W);
+  var meses = "";
+  [0,6,12,18,24,30,36].forEach(function(m){
+    meses += '<text x="'+(ml+larg*m/36).toFixed(1)+'" y="'+(H-10)+'" text-anchor="middle" font-size="12">'+m+'m</text>';
+  });
+  function pts(get){
+    var p = [];
+    for(var m=0;m<=36;m++){ var s=calc.serie(m); p.push((ml+larg*m/36).toFixed(1)+","+(base-get(s)/max*(base-topo)).toFixed(1)); }
+    return p.join(" ");
+  }
+  return '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Evolução mês a mês: estratégia Piscis contra a carteira atual">'+eixoY(max,ml,mr,base,topo,W)+meses+
+    '<polyline class="line-atual" fill="none" points="'+pts(function(s){return s.atual})+'"></polyline>'+
+    '<polyline class="line-piscis line-draw" fill="none" points="'+pts(function(s){return s.total})+'"></polyline></svg>';
+}
+function areaSVG(calc, W){
+  var H = Math.max(150, Math.round(W/3.6)), ml = 58, mr = 12, base = H-24, topo = 10;
+  var max = niceMax(Math.max(calc.serie(36).total, 1));
+  var larg = x1menos(ml, mr, W);
+  var grid = "";
+  [0, 0.5, 1].forEach(function(f){
+    var v=max*f, y=base-(base-topo)*f;
+    grid += '<line class="grid" x1="'+ml+'" x2="'+(W-mr)+'" y1="'+y+'" y2="'+y+'"></line>'+
+      '<text x="'+(ml-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="12">'+fmtMi(v)+'</text>';
+  });
+  function pt(m, v){ return (ml+larg*m/36).toFixed(1)+" "+(base-v/max*(base-topo)).toFixed(1); }
+  function layer(getBottom, getTop, cls){
+    var fwd=[], bwd=[];
+    for(var m=0;m<=36;m+=6){ var s=calc.serie(m); fwd.push(pt(m,getTop(s))); bwd.unshift(pt(m,getBottom(s))); }
+    return '<path class="'+cls+'" d="M'+fwd.join(" L")+" L"+bwd.join(" L")+' Z" opacity="0.9"></path>';
+  }
+  return '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Composição do patrimônio por reserva ao longo de 36 meses">'+grid+
+    layer(function(s){return 0}, function(s){return s.e}, "f-emerg")+
+    layer(function(s){return s.e}, function(s){return s.e+s.s}, "f-estrat")+
+    layer(function(s){return s.e+s.s}, function(s){return s.e+s.s+s.f}, "f-futura")+'</svg>';
+}
+
+/* ---------- documento completo (HTML), usado pelo gerador e pela visão do cliente ---------- */
+function renderDocHTML(d, P, W){
+  var calc = calcular(d, P);
+  var emissao = new Date().toLocaleDateString("pt-BR");
+  var crono = CRONOGRAMA.map(function(st){
+    return '<div class="tl"><span class="k">'+st.n+'</span><div><b>'+st.t+'</b><p>'+st.d+'</p></div><span class="w">'+st.sem+' sem. · acumulado '+st.acum+' sem.</span></div>';
+  }).join("");
+  var fx = calc.faixa;
+  var capAtualNota = d.capAtual>0 ? "cobertura declarada" : "sem cobertura declarada";
+  var premioTxt = 'Sob consulta';
+  return ''+
+  '<section class="capa pw-oceano">'+
+    '<svg class="pw-prancha capa-prancha" data-pw-prancha="3" aria-hidden="true"></svg>'+
+    '<span class="pw-sig"><span data-pw-symbol></span>Piscis Wealth</span>'+
+    '<p class="lbl">Estratégia patrimonial</p>'+
+    '<h1>'+esc(d.nome||"Cliente sem nome")+'</h1>'+
+    '<p class="long">Proposta de organização patrimonial em três reservas complementares (emergência, futura e estratégica), com projeção de 36 meses, proteção familiar e cronograma de implementação.</p>'+
+    '<div class="meta"><span>Idade: '+fmtInt(d.idade)+' anos</span><span>Dependentes: '+fmtInt(d.dependentes)+'</span><span>Renda mensal: '+fmtMoney(d.renda)+'</span><span>Emitida em '+emissao+'</span></div>'+
+  '</section>'+
+  '<section class="dsec"><div><p class="lbl">Panorama</p><h3>Situação patrimonial</h3></div>'+
+    '<dl class="kv cols">'+
+      '<div><dt>Patrimônio líquido disponível</dt><dd>'+fmtMoney(d.pl)+'</dd></div>'+
+      '<div><dt>Imobilizado (fora da alocação)</dt><dd>'+fmtMoney(d.imobilizado)+'</dd></div>'+
+      '<div><dt>Total alocado</dt><dd>'+fmtMoney(calc.a+calc.b+calc.c)+'</dd></div>'+
+      '<div><dt>Projeção 36 meses</dt><dd>'+fmtOr(calc.projTotal, fmtMoney, "A definir")+(calc.varPct!=null?' <span class="sub">'+fmtPct(calc.varPct)+' no período</span>':'')+(calc.fxPend?'<br><span class="sub">Pendente: faixa de dividendos da reserva estratégica acima de '+fmtMi(P.p7)+' ainda não definida.</span>':'')+'</dd></div>'+
+    '</dl>'+
+    '<dl class="kv">'+
+      '<div><dt>Objetivo imediato</dt><dd>'+esc(d.objImediato||"Não informado")+'</dd></div>'+
+      '<div><dt>Visão de 5 anos</dt><dd>'+esc(d.visao5||"Não informada")+'</dd></div>'+
+    '</dl>'+
+  '</section>'+
+  '<section class="dsec"><div><p class="lbl">Estratégia</p><h3>Alocação sugerida</h3></div>'+
+    '<div class="donut">'+donutSVG(d, calc)+'</div>'+
+    '<div class="legend"><span class="f-emerg">Emergência</span><span class="f-estrat">Estratégica</span><span class="f-futura">Futura</span></div>'+
+    '<dl class="kv">'+
+      '<div><dt>Reserva de emergência · '+fmtPct(d.pctA,0)+'</dt><dd>'+fmtMoney(calc.a)+' <span class="sub">Três fundos de '+fmtMoney(calc.a/3)+' · '+fmtPct(P.p1)+' a.m. · projeção '+fmtMoney(calc.projE)+'</span></dd></div>'+
+      '<div><dt>Reserva futura · '+fmtPct(d.pctB,0)+'</dt><dd>'+fmtMoney(calc.b)+' <span class="sub">Dolarizada · '+fmtPct(P.p2)+' a.m. · projeção '+fmtMoney(calc.projF)+'</span></dd></div>'+
+      '<div><dt>Reserva estratégica · '+fmtPct(d.pctC,0)+'</dt><dd>'+fmtMoney(calc.c)+' <span class="sub">'+(calc.fxPend?fx.rotulo+', projeção a definir':fmtPct(fx.taxa)+' a.m. ('+fx.rotulo+') · rendimentos reinvestidos mensalmente (1º mês ≈ '+fmtMoney(calc.dividendos)+')')+'</span></dd></div>'+
+    '</dl>'+
+    '<dl class="kv">'+
+      '<div><dt>Curto prazo</dt><dd>BTG Pactual · XP Investimentos</dd></div>'+
+      '<div><dt>Médio prazo</dt><dd>Worldse · ICA Select</dd></div>'+
+      '<div><dt>Longo prazo</dt><dd>Dominion · BMI</dd></div>'+
+    '</dl>'+
+  '</section>'+
+  '<section class="dsec"><div><p class="lbl">Comparação</p><h3>Hoje e em 36 meses</h3></div>'+
+    '<div class="chart">'+barsSVG(calc, W)+'</div>'+
+    '<div class="legend"><span class="f-hoje">Hoje</span><span>Em 36 meses (cor da reserva)</span></div>'+
+  '</section>'+
+  '<section class="dsec"><div><p class="lbl">Projeção</p><h3>Evolução mês a mês</h3></div>'+
+    '<p class="note">Modelo da projeção: emergência, futura e estratégica capitalizam; na reserva estratégica, os rendimentos são reinvestidos mês a mês.</p>'+
+    '<div class="chart">'+lineSVG(calc, W)+'</div>'+
+    '<div class="legend"><span class="line-piscis">Estratégia Piscis</span><span class="line-atual">Carteira atual ('+fmtPct(d.carteiraAtual)+' a.m.)</span></div>'+
+    '<div class="chart">'+areaSVG(calc, W)+'</div>'+
+    '<p class="legend"><span>Composição por reserva</span></p>'+
+    '<dl class="kv cols">'+
+      '<div><dt>Rentabilidade média</dt><dd>'+fmtOr(calc.rentMedia, function(v){return fmtPct(v);}, "A definir")+' <span class="sub">ao mês, entre as reservas ativas</span></dd></div>'+
+      '<div><dt>Taxa da reserva de emergência</dt><dd>'+fmtPct(calc.minEsp)+' <span class="sub">ao mês, estimada</span></dd></div>'+
+      '<div><dt>Carteira atual</dt><dd>'+fmtPct(d.carteiraAtual)+' <span class="sub">ao mês, informado pelo cliente</span></dd></div>'+
+    '</dl>'+
+  '</section>'+
+  '<section class="dsec"><div><p class="lbl">Blindagem</p><h3>Seguro de vida e consórcio</h3></div>'+
+    '<dl class="kv">'+
+      '<div><dt>Capital segurado ideal</dt><dd>'+fmtMoney(calc.capitalIdeal)+' <span class="sub">'+fmtInt(P.p9)+'x a renda mensal</span></dd></div>'+
+      '<div><dt>Prêmio anual estimado</dt><dd>'+premioTxt+'</dd></div>'+
+      '<div><dt>Capital atual</dt><dd>'+fmtMoney(d.capAtual)+' <span class="sub">'+capAtualNota+'</span></dd></div>'+
+      '<div><dt>Consórcio sugerido</dt><dd>'+fmtMoney(calc.consorcio)+' <span class="sub">'+fmtPct(P.p11,0)+' do patrimônio líquido disponível</span></dd></div>'+
+      '<div><dt>Objetivo do consórcio</dt><dd>'+esc(d.objConsorcio||"Não informado")+'</dd></div>'+
+    '</dl>'+
+  '</section>'+
+  '<section class="dsec"><div><p class="lbl">Implementação</p><h3>Cronograma</h3></div>'+
+    '<div class="timeline">'+crono+'</div>'+
+  '</section>'+
+  '<section class="dsec"><div><p class="lbl">Contato</p><h3>Consultor responsável</h3></div>'+
+    '<dl class="kv">'+
+      '<div><dt>Nome</dt><dd>'+esc(d.consultor.nome||"Não informado")+'</dd></div>'+
+      '<div><dt>E-mail</dt><dd>'+esc(d.consultor.email||"Não informado")+'</dd></div>'+
+      '<div><dt>Telefone</dt><dd>'+esc(d.consultor.tel||"Não informado")+'</dd></div>'+
+    '</dl>'+
+    '<p class="note">Documento de caráter informativo. Projeções são estimativas calculadas com parâmetros da Piscis Wealth, parte ainda em validação, na data de emissão, e não constituem garantia de rentabilidade futura. Itens marcados como \"em confirmação\", \"a definir\" ou \"sob consulta\" não são condições fechadas.</p>'+
+    '<p class="note"><b>Versão de teste com dados fictícios, gerada para validação interna.</b></p>'+
+  '</section>';
+}
+
+function decorate(root){
+  if(!window.PW || !root) return;
+  root.querySelectorAll("[data-pw-symbol]").forEach(function(el){ el.innerHTML = window.PW.symbol(); });
+  root.querySelectorAll(".pw-prancha[data-pw-prancha]").forEach(function(svg){ try{ window.PW.prancha(svg, +svg.getAttribute("data-pw-prancha")||3); }catch(e){} });
+}
+
+function chartLargura(){
+  var w = 0;
+  try{ var el = document.getElementById("doc-root") || document.getElementById("cli-doc"); if(el) w = el.clientWidth; }catch(e){}
+  if(!w){ try{ w = window.innerWidth; }catch(e){} }
+  if(!w) w = 900;
+  w = w - 56;
+  return Math.min(900, Math.max(240, Math.floor(w)));
+}
+
+return {PARAM_DEFS:PARAM_DEFS, parseBR:parseBR, fmtInt:fmtInt, fmtMoney:fmtMoney, fmtMi:fmtMi,
+  fmtPct:fmtPct, fmtOr:fmtOr, defaultParams:defaultParams, faixaEstrat:faixaEstrat,
+  calcular:calcular, CRONOGRAMA:CRONOGRAMA, esc:esc, renderDocHTML:renderDocHTML,
+  decorate:decorate, chartLargura:chartLargura};
+})();
+</script>
+
+<script>var PAYLOAD = {
+  "consultant_code": "FIC-01",
+  "client_alias": "Cliente Exemplo",
+  "objective": "Organizar a reserva e proteger a família.",
+  "patrimony_brl": 2000000,
+  "status": "enviada",
+  "created_at": "2026-11-26T09:30:00-03:00",
+  "content": {
+    "formato": "piscis-rico-v1",
+    "gerador": "piscis-propostas-completo@1",
+    "emitidaEm": "2026-11-26T14:28:05.819Z",
+    "parametros": {
+      "p1": 1.32,
+      "p2": 1.34,
+      "p3": 100000,
+      "p4": 1.5,
+      "p5": 500000,
+      "p6": 1.8,
+      "p7": 1000000,
+      "p8": 2,
+      "p9": 60,
+      "p11": 10
+    },
+    "entrevista": {
+      "nome": "Cliente Exemplo",
+      "idade": 45,
+      "dependentes": 2,
+      "renda": 35000,
+      "objImediato": "Organizar a reserva e proteger a família.",
+      "visao5": "Renda passiva cobrindo o custo de vida.",
+      "pl": 2000000,
+      "imobilizado": 800000,
+      "pctA": 25,
+      "pctB": 30,
+      "pctC": 45,
+      "carteiraAtual": 0.8,
+      "capAtual": 0,
+      "objConsorcio": "Imóvel no litoral.",
+      "consultor": {
+        "nome": "[NOME DO CONSULTOR]",
+        "email": "seu.nome@pisciswealth.com.br",
+        "tel": "+55 [DDD] [TELEFONE]"
+      }
+    },
+    "resultado": {
+      "alocacao": {
+        "emergencia": 500000,
+        "futura": 600000,
+        "estrategica": 900000
+      },
+      "projecao36": {
+        "emergencia": 801671.6480658386,
+        "futura": 968865.8507266389,
+        "estrategica": 1835898.6093441348,
+        "total": 3606436.108136612
+      },
+      "rendimentoMes1Reinvestido": 18000,
+      "faixaEstrategica": "R$ 500k a R$ 1,0M",
+      "rentabilidadeMediaMes": 1.6511862889249773,
+      "taxaEmergenciaMes": 1.32,
+      "capitalSeguradoIdeal": 2100000,
+      "consorcioSugerido": 200000
+    },
+    "pendencias": {
+      "faixaEstrategicaAcimaDaUltima": false
+    },
+    "aviso": "Versão de teste com dados fictícios."
+  }
+};</script>
+<script>
+/* Visão do cliente (piloto): documento completo da proposta.
+   Dois modos: com #token= na URL, busca a proposta de teste no backend do piloto
+   (RPCs get_proposal_by_token, mark_proposal_viewed, submit_proposal_response);
+   sem token, usa o payload fictício embutido e registra a resposta só neste
+   navegador (prévia local). Sem dados reais. */
+(function(){
+"use strict";
+var LS_RESP = "piscis.cli-resposta.v1";
+var STATUS = {aprovada:"Aprovada", ressalvas:"Aprovada com ressalvas", reprovada:"Reprovada", fechamento_comprovado:"Fechamento comprovado"};
+function $(id){ return document.getElementById(id); }
+var parseBR = PiscisDoc.parseBR, esc = PiscisDoc.esc;
+
+var SUPA_URL = 'https://wwjmylskhexjspurvwwp.supabase.co';
+var SUPA_KEY = 'sb_publishable_7oWJRwRyguyjVvYoP-bWVA_mgNKPRV_';
+var sb = null;
+try { if (window.supabase && window.supabase.createClient) sb = window.supabase.createClient(SUPA_URL, SUPA_KEY); } catch(e){ sb = null; }
+
+function hashParams(){
+  var h = location.hash.replace(/^#/, '');
+  var out = {};
+  h.split('&').forEach(function(p){ var kv = p.split('='); if (kv[0]) out[kv[0]] = decodeURIComponent(kv[1] || ''); });
+  return out;
+}
+var TOKEN = hashParams().token || null;
+
+function dadosFrom(ent){
+  return {nome:ent.nome, idade:parseBR(ent.idade), dependentes:parseBR(ent.dependentes),
+    renda:parseBR(ent.renda), objImediato:ent.objImediato, visao5:ent.visao5,
+    pl:parseBR(ent.pl), imobilizado:parseBR(ent.imobilizado),
+    pctA:+ent.pctA||0, pctB:+ent.pctB||0, pctC:+ent.pctC||0,
+    carteiraAtual:parseBR(ent.carteiraAtual), capAtual:parseBR(ent.capAtual),
+    objConsorcio:ent.objConsorcio, consultor:ent.consultor||{nome:"",email:"",tel:""}};
+}
+var atual = null;
+function renderCli(){
+  if(!atual) return;
+  var el = $("cli-doc");
+  el.innerHTML = PiscisDoc.renderDocHTML(dadosFrom(atual.content.entrevista), atual.content.parametros, PiscisDoc.chartLargura());
+  PiscisDoc.decorate(el);
+}
+window.renderCli = renderCli;
+var rsz = null;
+window.addEventListener("resize", function(){
+  clearTimeout(rsz);
+  rsz = setTimeout(function(){ var el = $("cli-doc"); if(el && el.innerHTML) renderCli(); }, 300);
+});
+
+function renderPayload(p){
+  atual = p;
+  var ent = p.content.entrevista;
+  $("cli-alias").textContent = p.client_alias;
+  $("cli-consultor").textContent = (ent.consultor && ent.consultor.nome) || "Consultor Piscis (teste)";
+  var em = p.content.emitidaEm ? new Date(p.content.emitidaEm) : (p.created_at ? new Date(p.created_at) : new Date());
+  $("cli-data").textContent = em.toLocaleDateString("pt-BR");
+  $("cli-objetivo").textContent = p.objective ? "Objetivo: " + p.objective : "";
+  $("cli-aviso").textContent = (p.content.aviso || "Versão de teste com dados fictícios.") + " Nenhuma proposta real está sendo apresentada.";
+  renderCli();
+}
+
+function marcarRespondida(status){
+  $("cli-status-area").innerHTML = '<span class="chip respondida">Respondida neste teste: '+esc(STATUS[status]||status)+'</span>';
+  $("cli-responder").classList.add("hidden");
+  $("cli-confirmar").classList.add("hidden");
+  $("cli-final").classList.remove("hidden");
+}
+
+var escolha = null;
+Array.prototype.forEach.call(document.querySelectorAll("#cli-responder button[data-resp]"), function(b){
+  b.addEventListener("click", function(){
+    escolha = b.getAttribute("data-resp");
+    $("conf-titulo").textContent = "Confirmar: " + (STATUS[escolha]||escolha) + " (teste)?";
+    $("cli-responder").classList.add("hidden");
+    $("cli-confirmar").classList.remove("hidden");
+  });
+});
+$("conf-voltar").addEventListener("click", function(){
+  $("cli-confirmar").classList.add("hidden");
+  $("cli-responder").classList.remove("hidden");
+});
+
+/* ---------- modo ao vivo: proposta de teste por token ---------- */
+function initLive(token){
+  if(!sb){ $("cli-card").innerHTML = '<p class="mut">Não foi possível carregar o piloto neste navegador.</p>'; return; }
+  sb.rpc('get_proposal_by_token', { p_token: token }).then(function(r){
+    if (r.error || !r.data || !r.data.length) {
+      $("cli-card").innerHTML = '<p class="mut">Link inválido ou proposta de teste não encontrada.</p>';
+      return;
+    }
+    var prop = r.data[0];
+    if (!prop.content || prop.content.formato !== 'piscis-rico-v1' || !prop.content.entrevista) {
+      $("cli-card").innerHTML = '<p class="mut">Esta proposta de teste está em formato antigo. Peça ao consultor o link mais recente.</p>';
+      return;
+    }
+    renderPayload(prop);
+    var respondida = ['aprovada','reprovada','ressalvas','fechamento_comprovado'].indexOf(prop.status) >= 0;
+    if (respondida) { marcarRespondida(prop.status); return; }
+    var marcarView = function(tent){
+      sb.rpc('mark_proposal_viewed', { p_token: token }).then(function(r){
+        if (r && r.error && tent < 2) setTimeout(function(){ marcarView(tent + 1); }, 2000);
+      }, function(){
+        if (tent < 2) setTimeout(function(){ marcarView(tent + 1); }, 2000);
+      });
+    };
+    marcarView(0);
+    $("cli-responder").classList.remove("hidden");
+    $("conf-sim").addEventListener("click", function(){
+      sb.rpc('submit_proposal_response', { p_token: token, p_response: escolha || 'aprovada', p_note: $("cli-nota").value || null }).then(function(rr){
+        if (rr.error) { $("cli-erro").textContent = 'Não foi possível registrar. Tente de novo.'; $("cli-confirmar").classList.add("hidden"); $("cli-responder").classList.remove("hidden"); return; }
+        marcarRespondida(escolha || 'aprovada');
+      });
+    });
+  });
+}
+
+/* ---------- prévia local: payload embutido, resposta só neste navegador ---------- */
+function recorded(){ try{ return JSON.parse(localStorage.getItem(LS_RESP)||"null"); }catch(e){ return null; } }
+function initPreview(){
+  renderPayload(PAYLOAD);
+  $("conf-sim").addEventListener("click", function(){
+    var rec = {status:escolha||"aprovada", nota:$("cli-nota").value, ts:new Date().toISOString(), local:true};
+    try{ localStorage.setItem(LS_RESP, JSON.stringify(rec)); }catch(e){}
+    marcarRespondida(rec.status);
+  });
+  var rec = recorded();
+  if(rec) marcarRespondida(rec.status); else $("cli-responder").classList.remove("hidden");
+}
+
+if (TOKEN) initLive(TOKEN); else initPreview();
+})();
+
+</script>
+</body>
+</html>
